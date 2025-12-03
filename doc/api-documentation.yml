@@ -1,0 +1,181 @@
+openapi: 3.0.3
+
+info:
+  title: Hotringo Contact API
+  version: 1.0.0
+  description: |
+    API untuk formulir kontak di website hotringo.tech.
+    Pesan yang dikirim akan diteruskan ke admin via email (AWS SES)
+    dan disimpan di database untuk keperluan tracking.
+
+servers:
+  - url: https://api.hotringo.tech
+    description: Production
+  - url: http://localhost:8000
+    description: Local development (Laravel built-in server)
+
+tags:
+  - name: Healthcheck
+    description: Endpoint untuk cek status API.
+  - name: Contact
+    description: Endpoint untuk mengirim pesan dari formulir kontak.
+
+paths:
+  /api/ping:
+    get:
+      tags: [Healthcheck]
+      summary: Cek status API
+      operationId: ping
+      responses:
+        '200':
+          description: API berjalan dengan baik
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PingResponse'
+
+  /api/contact:
+    post:
+      tags: [Contact]
+      summary: Kirim pesan dari form kontak
+      operationId: submitContact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactRequest'
+      responses:
+        '201':
+          description: Pesan berhasil disimpan dan email terkirim ke admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactResponse'
+        '400':
+          description: Permintaan tidak valid (bad request)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validasi input gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '500':
+          description: Terjadi kesalahan di server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    PingResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: API hotringo-ses berjalan
+        data:
+          type: object
+          properties:
+            service:
+              type: string
+              example: contact-api
+        errors:
+          type: object
+          nullable: true
+          example: null
+
+    ContactRequest:
+      type: object
+      required:
+        - name
+        - email
+        - subject
+        - message
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: Theodorus Christian
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: theodorus@example.com
+        subject:
+          type: string
+          maxLength: 255
+          example: Pertanyaan kerjasama
+        message:
+          type: string
+          example: >
+            Halo, saya tertarik menggunakan layanan Anda untuk integrasi email API...
+
+    ContactResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: >
+            Pesan Anda sudah tersimpan dan terkirim. Balasan akan dikirim maksimal 1×24 jam (hari kerja).
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+              example: 123
+        errors:
+          type: object
+          nullable: true
+          example: null
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Terjadi kesalahan
+        data:
+          type: object
+          nullable: true
+          example: null
+        errors:
+          type: object
+          nullable: true
+          example: null
+
+    ValidationErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            errors:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+          example:
+            success: false
+            message: Validasi gagal
+            data: null
+            errors:
+              email:
+                - Format email tidak valid
+              name:
+                - Kolom name wajib diisi
